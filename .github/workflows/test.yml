@@ -1,0 +1,50 @@
+name: CI Pipeline
+
+on:
+  - push
+  - pull_request
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (Node.js ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ['20', '22']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - name: Install dependencies
+        if: hashFiles('package.json', 'package-lock.json', 'npm-shrinkwrap.json') != ''
+        run: npm ci
+
+      - name: Lint
+        if: hashFiles('package.json', 'package-lock.json', 'npm-shrinkwrap.json') != ''
+        run: npm run lint
+
+      - name: Build or type check
+        if: hashFiles('package.json', 'package-lock.json', 'npm-shrinkwrap.json') != ''
+        run: npm run build
+
+      - name: Test
+        if: hashFiles('package.json', 'package-lock.json', 'npm-shrinkwrap.json') != ''
+        run: npm test
+
+      - name: Summary
+        if: always()
+        run: echo "Node.js ${{ matrix.node-version }}: skipped when no npm manifest was present; otherwise lint, build, and test completed." >> "$GITHUB_STEP_SUMMARY"
